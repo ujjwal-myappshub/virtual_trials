@@ -1,0 +1,28 @@
+name: virtual_jewelry_tryon
+description: Virtual try-on for jewelry using Flutter + ML Kit
+publish_to: "none"
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  camera: ^0.11.0+2
+  google_mlkit_commons: ^0.11.0
+  google_mlkit_face_detection: ^0.13.1
+
+  # UI + Utils
+  path_provider: ^2.1.2
+  flutter_spinkit: ^5.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/jewelry/
