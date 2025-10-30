@@ -149,6 +149,47 @@ class _CapturedImagePainter extends CustomPainter {
       
       canvas.restore();
     }
+    // Draw earrings (captured mode painter didn't previously handle this)
+    else if (product.type == JewelryType.earring) {
+      final double eSize = (imageRect.width * 0.14 * scale).clamp(24.0, 160.0);
+      // Place around face area heuristically when no face landmarks are available in captured painter
+      final double earSpacing = imageRect.width * 0.22 * scale; // horizontal distance from center
+      final double earY = centerY - imageRect.height * 0.08; // slightly above center
+
+      final Paint paint = Paint();
+
+      if (earringLeft != null && showLeft) {
+        final Rect dstLeft = Rect.fromCenter(
+          center: Offset(centerX - earSpacing, earY),
+          width: eSize,
+          height: eSize * 1.2,
+        );
+        final Rect srcLeft = Rect.fromLTWH(0, 0, earringLeft!.width.toDouble(), earringLeft!.height.toDouble());
+
+        canvas.save();
+        canvas.translate(dstLeft.center.dx, dstLeft.center.dy);
+        canvas.rotate(jewelryRotation);
+        canvas.translate(-dstLeft.center.dx, -dstLeft.center.dy);
+        canvas.drawImageRect(earringLeft!, srcLeft, dstLeft, paint);
+        canvas.restore();
+      }
+
+      if (earringRight != null && showRight) {
+        final Rect dstRight = Rect.fromCenter(
+          center: Offset(centerX + earSpacing, earY),
+          width: eSize,
+          height: eSize * 1.2,
+        );
+        final Rect srcRight = Rect.fromLTWH(0, 0, earringRight!.width.toDouble(), earringRight!.height.toDouble());
+
+        canvas.save();
+        canvas.translate(dstRight.center.dx, dstRight.center.dy);
+        canvas.rotate(jewelryRotation);
+        canvas.translate(-dstRight.center.dx, -dstRight.center.dy);
+        canvas.drawImageRect(earringRight!, srcRight, dstRight, paint);
+        canvas.restore();
+      }
+    }
   }
 
   @override
