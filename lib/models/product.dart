@@ -22,7 +22,7 @@ class Product {
 final List<Product> demoProducts = [
   const Product(
     id: '1',
-    name: 'Diamond Necklace',
+    name: 'Necklace',
     image: 'assets/jewelry/necklace.png',
     type: JewelryType.necklace,
     price: 299.99,
@@ -30,7 +30,7 @@ final List<Product> demoProducts = [
   ),
   const Product(
     id: '2',
-    name: 'Gold Earrings',
+    name: 'Earrings',
     image: 'assets/jewelry/earring_left.png',
     type: JewelryType.earring,
     price: 199.99,

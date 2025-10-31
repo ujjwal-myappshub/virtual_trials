@@ -746,44 +746,44 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
               ),
 
             // Debug overlay
-            if (kDebugMode)
-              Positioned(
-                top: 10,
-                left: 10,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Face: ${_face != null ? 'Detected' : 'Not Detected'}',
-                        style:
-                            const TextStyle(color: Colors.white, fontSize: 11),
-                      ),
-                      Text(
-                        'Pos: ${_estimatedFaceCenterX.toStringAsFixed(2)}, ${_estimatedFaceCenterY.toStringAsFixed(2)}',
-                        style:
-                            const TextStyle(color: Colors.white, fontSize: 11),
-                      ),
-                      Text(
-                        'Size: ${_estimatedFaceSize.toStringAsFixed(2)}',
-                        style:
-                            const TextStyle(color: Colors.white, fontSize: 11),
-                      ),
-                      if (_controller?.value.previewSize != null)
-                        Text(
-                          'Preview: ${_controller!.value.previewSize!.width.toInt()}x${_controller!.value.previewSize!.height.toInt()}',
-                          style: const TextStyle(
-                              color: Colors.white, fontSize: 11),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
+            // if (kDebugMode)
+            //   Positioned(
+            //     top: 10,
+            //     left: 10,
+            //     child: Container(
+            //       padding: const EdgeInsets.all(8),
+            //       decoration: BoxDecoration(
+            //         color: Colors.black54,
+            //         borderRadius: BorderRadius.circular(8),
+            //       ),
+            //       child: Column(
+            //         crossAxisAlignment: CrossAxisAlignment.start,
+            //         children: [
+            //           Text(
+            //             'Face: ${_face != null ? 'Detected' : 'Not Detected'}',
+            //             style:
+            //                 const TextStyle(color: Colors.white, fontSize: 11),
+            //           ),
+            //           Text(
+            //             'Pos: ${_estimatedFaceCenterX.toStringAsFixed(2)}, ${_estimatedFaceCenterY.toStringAsFixed(2)}',
+            //             style:
+            //                 const TextStyle(color: Colors.white, fontSize: 11),
+            //           ),
+            //           Text(
+            //             'Size: ${_estimatedFaceSize.toStringAsFixed(2)}',
+            //             style:
+            //                 const TextStyle(color: Colors.white, fontSize: 11),
+            //           ),
+            //           if (_controller?.value.previewSize != null)
+            //             Text(
+            //               'Preview: ${_controller!.value.previewSize!.width.toInt()}x${_controller!.value.previewSize!.height.toInt()}',
+            //               style: const TextStyle(
+            //                   color: Colors.white, fontSize: 11),
+            //             ),
+            //         ],
+            //       ),
+            //     ),
+            //   ),
 
             // Top back button
             Positioned(
@@ -811,14 +811,14 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     // Flash toggle
-                    IconButton(
-                      icon: Icon(
-                        _torchOn ? Icons.flash_on : Icons.flash_off,
-                        color: Colors.white,
-                        size: 30,
-                      ),
-                      onPressed: _toggleTorch,
-                    ),
+                    // IconButton(
+                    //   icon: Icon(
+                    //     _torchOn ? Icons.flash_on : Icons.flash_off,
+                    //     color: Colors.white,
+                    //     size: 30,
+                    //   ),
+                    //   onPressed: _toggleTorch,
+                    // ),
                     const SizedBox(height: 20),
                     // Capture button
                     GestureDetector(
@@ -866,30 +866,30 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
                     ),
                     
                     // Save button
-                    ElevatedButton(
-                      onPressed: () {
-                        // TODO: Implement save functionality
-                        _closeCameraAndPop();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 32,
-                          vertical: 12,
-                        ),
-                      ),
-                      child: const Text(
-                        'Save',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
+                    // ElevatedButton(
+                    //   onPressed: () {
+                    //     // TODO: Implement save functionality
+                    //     _closeCameraAndPop();
+                    //   },
+                    //   style: ElevatedButton.styleFrom(
+                    //     backgroundColor: Colors.blue,
+                    //     shape: RoundedRectangleBorder(
+                    //       borderRadius: BorderRadius.circular(20),
+                    //     ),
+                    //     padding: const EdgeInsets.symmetric(
+                    //       horizontal: 32,
+                    //       vertical: 12,
+                    //     ),
+                    //   ),
+                    //   child: const Text(
+                    //     'Save',
+                    //     style: TextStyle(
+                    //       color: Colors.white,
+                    //       fontSize: 18,
+                    //       fontWeight: FontWeight.w500,
+                    //     ),
+                    //   ),
+                    // ),
                   ],
                 ),
               ),

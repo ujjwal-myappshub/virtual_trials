@@ -20,7 +20,6 @@ class OverlayPainter extends CustomPainter {
   static const double _headYawNormalizationFactor = 45.0;
   static const double _headRollNormalizationFactor = 45.0;
   static const double _earringRotationFactor = 0.3;
-  static const double _necklaceRotationFactor = 0.2;
 
   final Face? face;
   final Size? imageSize;
@@ -153,8 +152,6 @@ class OverlayPainter extends CustomPainter {
     final double adjustedFaceCenterY = scaledFaceCenterY + manualOffsetY;
     final double adjustedFaceWidth = scaledFaceWidth * manualScale;
     
-    debugPrint('Manual adjustments - X: $manualOffsetX, Y: $manualOffsetY, Scale: $manualScale, Rotation: $manualRotation');
-
     // Calculate head rotation and tilt with null safety and smoothing
     // When in adjustment mode, we want to ignore the automatic head rotation
     final double headYaw = _isAdjustmentMode ? 0.0 : ((face?.headEulerAngleY ?? 0.0) / _headYawNormalizationFactor);
@@ -167,7 +164,6 @@ class OverlayPainter extends CustomPainter {
     // Combine rotations
     final double totalEarringRotation = manualRotation + rollComponentEarring;
     // We're using manualRotation directly for necklace to simplify the rotation
-    debugPrint('Painting with manualOffset: ($manualOffsetX, $manualOffsetY), scale: $manualScale, rotation: $manualRotation');
 
     // Position jewelry based on face position and rotation
     if (product.type == JewelryType.earring) {
@@ -262,7 +258,6 @@ class OverlayPainter extends CustomPainter {
         if (mirrorX) canvas.restore();
       }
     } else if (product.type == JewelryType.necklace && showNecklace && necklace != null) {
-      debugPrint('Painting necklace at: ($adjustedFaceCenterX, $adjustedFaceCenterY) with manual offset: ($manualOffsetX, $manualOffsetY)');
       
       // Calculate base necklace dimensions
       final double baseNecklaceWidth = adjustedFaceWidth * _necklaceWidthMultiplier;
@@ -308,15 +303,6 @@ class OverlayPainter extends CustomPainter {
     }
     
     // Face landmarks are available but not currently used for positioning
-    // Commented out to avoid unused variable warnings
-    /*
-    if (face != null && face!.landmarks.isNotEmpty) {
-      final landmarks = face!.landmarks;
-      // These positions could be used for more accurate earring placement
-      final rightEar = landmarks[FaceLandmarkType.rightEar]?.position;
-      final leftEar = landmarks[FaceLandmarkType.leftEar]?.position;
-    }
-    */
   }
 
   @override
