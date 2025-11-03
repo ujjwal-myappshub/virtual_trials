@@ -759,6 +759,37 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
                   ),
                 ),
 
+// Live preview gesture controls (drag/resize/rotate without capturing)
+if (_isInitialized && !_isCaptured)
+  Positioned.fill(
+    child: GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onScaleStart: (details) {
+        _initialFocalPoint = details.focalPoint;
+        _lastScale = _jewelryScale;
+        _lastRotation = _jewelryRotation;
+        _lastOffset = Offset(_jewelryOffsetX, _jewelryOffsetY);
+      },
+      onScaleUpdate: (details) {
+        setState(() {
+          // Pan with one finger
+          if (details.pointerCount == 1) {
+            _jewelryOffsetX = _lastOffset.dx + (details.focalPoint.dx - _initialFocalPoint.dx);
+            _jewelryOffsetY = _lastOffset.dy + (details.focalPoint.dy - _initialFocalPoint.dy);
+          }
+          // Scale with pinch
+          if (details.scale != 1.0) {
+            _jewelryScale = (_lastScale * details.scale).clamp(0.3, 3.0);
+          }
+          // Rotate with two fingers
+          if (details.rotation != 0.0) {
+            _jewelryRotation = (_lastRotation + details.rotation) % (2 * 3.14159);
+          }
+        });
+      },
+      child: Container(color: Colors.transparent),
+    ),
+  ),
               Positioned(
                 top: 16,
                 left: 16,
