@@ -4,10 +4,8 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
-import 'package:google_mlkit_commons/google_mlkit_commons.dart';
 import '../models/product.dart';
 import 'widgets/overlay_painter.dart';
 
@@ -85,7 +83,6 @@ class _CapturedImagePainter extends CustomPainter {
     final double centerY = imageRect.center.dy + jewelryOffsetY;
     final double scale = jewelryScale.clamp(0.3, 3.0);
 
-    // Draw necklace
     if (product.type == JewelryType.necklace && showNecklace && necklace != null) {
       final double baseWidth = imageRect.width * 0.6 * scale;
       final double baseHeight = baseWidth * 0.4;
@@ -96,7 +93,6 @@ class _CapturedImagePainter extends CustomPainter {
         height: baseHeight,
       );
 
-      // Draw shadow
       final shadowPaint = Paint()
         ..color = Colors.black.withOpacity(0.3)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8.0);
@@ -104,25 +100,18 @@ class _CapturedImagePainter extends CustomPainter {
       canvas.save();
       canvas.translate(dstRect.center.dx, dstRect.center.dy + 5);
       canvas.scale(1.0, 0.5);
-      canvas.drawCircle(
-        Offset.zero,
-        baseWidth * 0.4,
-        shadowPaint,
-      );
+      canvas.drawCircle(Offset.zero, baseWidth * 0.4, shadowPaint);
       canvas.restore();
 
-      // Draw necklace
       canvas.save();
       canvas.translate(dstRect.center.dx, dstRect.center.dy);
       canvas.rotate(jewelryRotation);
-      
-      // Add a subtle border
+
       final borderPaint = Paint()
         ..color = Colors.white.withOpacity(0.8)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.0;
-      
-      // Draw the necklace image
+
       paintImage(
         canvas: canvas,
         rect: Rect.fromCenter(
@@ -133,8 +122,7 @@ class _CapturedImagePainter extends CustomPainter {
         image: necklace!,
         fit: BoxFit.contain,
       );
-      
-      // Draw border
+
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           Rect.fromCenter(
@@ -146,15 +134,11 @@ class _CapturedImagePainter extends CustomPainter {
         ),
         borderPaint,
       );
-      
       canvas.restore();
-    }
-    // Draw earrings (captured mode painter didn't previously handle this)
-    else if (product.type == JewelryType.earring) {
+    } else if (product.type == JewelryType.earring) {
       final double eSize = (imageRect.width * 0.14 * scale).clamp(24.0, 160.0);
-      // Place around face area heuristically when no face landmarks are available in captured painter
-      final double earSpacing = imageRect.width * 0.22 * scale; // horizontal distance from center
-      final double earY = centerY - imageRect.height * 0.08; // slightly above center
+      final double earSpacing = imageRect.width * 0.22 * scale;
+      final double earY = centerY - imageRect.height * 0.08;
 
       final Paint paint = Paint();
 
@@ -165,7 +149,6 @@ class _CapturedImagePainter extends CustomPainter {
           height: eSize * 1.2,
         );
         final Rect srcLeft = Rect.fromLTWH(0, 0, earringLeft!.width.toDouble(), earringLeft!.height.toDouble());
-
         canvas.save();
         canvas.translate(dstLeft.center.dx, dstLeft.center.dy);
         canvas.rotate(jewelryRotation);
@@ -181,7 +164,6 @@ class _CapturedImagePainter extends CustomPainter {
           height: eSize * 1.2,
         );
         final Rect srcRight = Rect.fromLTWH(0, 0, earringRight!.width.toDouble(), earringRight!.height.toDouble());
-
         canvas.save();
         canvas.translate(dstRight.center.dx, dstRight.center.dy);
         canvas.rotate(jewelryRotation);
@@ -207,30 +189,26 @@ class _CapturedImagePainter extends CustomPainter {
 }
 
 class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
-  // Camera & controller
   CameraController? _controller;
   bool _isInitialized = false;
   bool _isProcessing = false;
   bool _isCaptured = false;
-  bool _torchOn = false;
+  
   ui.Image? _capturedImage;
   DateTime? _lastProcessTime;
-  static const int _minProcessingIntervalMs = 66; // ~15 FPS
+  static const int _minProcessingIntervalMs = 66;
 
-  // Face tracking
   Face? _face;
   double _estimatedFaceCenterX = 0.5;
   double _estimatedFaceCenterY = 0.4;
   double _estimatedFaceSize = 0.2;
   int _rotation = 0;
 
-  // UI toggles
   bool _showLeft = true;
   bool _showRight = true;
   bool _showNecklace = true;
   bool _adjustmentMode = false;
 
-  // Manual adjustment
   double _jewelryOffsetX = 0.0;
   double _jewelryOffsetY = 0.0;
   double _jewelryScale = 1.0;
@@ -239,18 +217,24 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
   double _lastRotation = 0.0;
   Offset _lastOffset = Offset.zero;
   Offset _initialFocalPoint = Offset.zero;
-  double _initialRotation = 0.0;
+  
+  double _smoothedCenterX = 0.5;
+  double _smoothedCenterY = 0.4;
+  double _smoothedFaceSize = 0.2;
+  double _smoothedYaw = 0.0;
+  double _smoothingAlpha = 0.2;
+  int _frameCount = 0;
 
-  // Face detector
   final FaceDetector _faceDetector = FaceDetector(
     options: FaceDetectorOptions(
       enableTracking: true,
-      performanceMode: FaceDetectorMode.accurate,
-      minFaceSize: 0.15,
+      enableLandmarks: true,
+      enableContours: false,
+      performanceMode: FaceDetectorMode.fast,
+      minFaceSize: 0.10,
     ),
   );
 
-  // Assets
   ui.Image? _earringLeftImg;
   ui.Image? _earringRightImg;
   ui.Image? _necklaceImg;
@@ -290,7 +274,6 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
         throw Exception('No cameras available');
       }
 
-      // Prefer front camera
       final camera = cameras.firstWhere(
         (c) => c.lensDirection == CameraLensDirection.front,
         orElse: () => cameras.first,
@@ -308,6 +291,8 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
       await _controller?.initialize();
       if (!mounted) return;
 
+      _rotation = _computeImageRotation();
+
       setState(() => _isInitialized = true);
       _startImageStream();
     } catch (e) {
@@ -322,6 +307,7 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
 
   void _startImageStream() {
     if (_controller == null || !_isInitialized) return;
+    if (_controller!.value.isStreamingImages) return;
 
     _controller?.startImageStream((CameraImage image) {
       if (!_isProcessing) {
@@ -343,29 +329,24 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
   Future<InputImage?> _inputImageFromCameraImage(
       CameraImage image, int rotation) async {
     try {
-      // Get the image bytes
       final WriteBuffer allBytes = WriteBuffer();
       for (final Plane plane in image.planes) {
         allBytes.putUint8List(plane.bytes);
       }
       final bytes = allBytes.done().buffer.asUint8List();
 
-      // Get image size
       final Size imageSize = Size(
         image.width.toDouble(),
         image.height.toDouble(),
       );
 
-      // Get image rotation
       final imageRotation = InputImageRotationValue.fromRawValue(rotation);
       if (imageRotation == null) return null;
 
-      // Get image format
       final inputImageFormat =
           InputImageFormatValue.fromRawValue(image.format.raw);
       if (inputImageFormat == null) return null;
 
-      // Create input image metadata
       final metadata = InputImageMetadata(
         size: imageSize,
         rotation: imageRotation,
@@ -373,7 +354,6 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
         bytesPerRow: image.planes[0].bytesPerRow,
       );
 
-      // Return the input image
       return InputImage.fromBytes(
         bytes: bytes,
         metadata: metadata,
@@ -386,6 +366,11 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
 
   Future<void> _processCameraImage(CameraImage image) async {
     if (!mounted || _isCaptured) return;
+
+    _frameCount = (_frameCount + 1) % 3;
+    if (_frameCount != 0) return;
+
+    _rotation = _computeImageRotation();
 
     final now = DateTime.now();
     if (_lastProcessTime != null &&
@@ -416,30 +401,67 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
     }
   }
 
+  int _computeImageRotation() {
+    if (_controller == null) return 0;
+    final description = _controller!.description;
+    final deviceOrientation = _controller!.value.deviceOrientation;
+
+    int rotationDegrees;
+    switch (deviceOrientation) {
+      case DeviceOrientation.portraitUp:
+        rotationDegrees = 0;
+        break;
+      case DeviceOrientation.landscapeLeft:
+        rotationDegrees = 90;
+        break;
+      case DeviceOrientation.portraitDown:
+        rotationDegrees = 180;
+        break;
+      case DeviceOrientation.landscapeRight:
+        rotationDegrees = 270;
+        break;
+    }
+
+    int finalRotation;
+    if (description.lensDirection == CameraLensDirection.front) {
+      finalRotation = (description.sensorOrientation - rotationDegrees) % 360;
+    } else {
+      finalRotation = (description.sensorOrientation + rotationDegrees) % 360;
+    }
+    return (finalRotation + 360) % 360;
+  }
+
   void _updateFacePosition() {
     if (_face == null || _controller?.value.previewSize == null) return;
 
     final previewSize = _controller!.value.previewSize!;
     final face = _face!;
 
-    // Update face position
     final faceRect = face.boundingBox;
-    _estimatedFaceCenterX =
+    final targetCenterX =
         (faceRect.left + faceRect.right) / 2 / previewSize.width;
-    _estimatedFaceCenterY =
+    final targetCenterY =
         (faceRect.top + faceRect.bottom) / 2 / previewSize.height;
-    _estimatedFaceSize = faceRect.width / previewSize.width;
+    final targetSize = faceRect.width / previewSize.width;
 
-    // Update rotation based on face angle
+    _smoothedCenterX = _smoothedCenterX * (1 - _smoothingAlpha) + targetCenterX * _smoothingAlpha;
+    _smoothedCenterY = _smoothedCenterY * (1 - _smoothingAlpha) + targetCenterY * _smoothingAlpha;
+    _smoothedFaceSize = _smoothedFaceSize * (1 - _smoothingAlpha) + targetSize * _smoothingAlpha;
+
+    _estimatedFaceCenterX = _smoothedCenterX;
+    _estimatedFaceCenterY = _smoothedCenterY;
+    _estimatedFaceSize = _smoothedFaceSize;
+
     if (face.headEulerAngleY != null) {
-      _jewelryRotation = face.headEulerAngleY! * (3.14159 / 180.0);
+      final targetYawRad = face.headEulerAngleY! * (3.14159 / 180.0);
+      _smoothedYaw = _smoothedYaw * (1 - _smoothingAlpha) + targetYawRad * _smoothingAlpha;
+      _jewelryRotation = _smoothedYaw;
     }
   }
 
   Future<void> _preloadAssets() async {
     try {
       if (widget.product.type == JewelryType.earring) {
-        // Load left and right earring assets; fall back to mirroring left if right missing
         await _loadUiImage('assets/jewelry/earring_left.png');
         await _loadUiImage('assets/jewelry/earring_right.png');
 
@@ -449,9 +471,7 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
           });
         }
       } else if (widget.product.type == JewelryType.necklace) {
-        // Load the selected necklace image explicitly
         await _loadNecklace(widget.product.image);
-        // Fallback to default path if loading by product image failed
         if (_necklaceImg == null) {
           await _loadNecklace('assets/jewelry/necklace.png');
         }
@@ -520,9 +540,7 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
         setState(() {
           _isCaptured = true;
           _capturedImage = capturedImage;
-          _adjustmentMode = true; // Enable adjustment mode after capture
-          
-          // Reset adjustments to default values
+          _adjustmentMode = true;
           _jewelryOffsetX = 0.0;
           _jewelryOffsetY = 0.0;
           _jewelryScale = 1.0;
@@ -531,7 +549,6 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
           _lastRotation = 0.0;
           _lastOffset = Offset.zero;
           _initialFocalPoint = Offset.zero;
-          
           if (_face != null) {
             _updateFacePosition();
           }
@@ -551,42 +568,59 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
     setState(() {
       _isCaptured = false;
       _capturedImage = null;
-      _adjustmentMode = false; // Disable adjustment mode when retaking
-      
-      // Reset all adjustments
+      _adjustmentMode = false;
       _jewelryOffsetX = 0.0;
       _jewelryOffsetY = 0.0;
       _jewelryScale = 1.0;
       _jewelryRotation = 0.0;
       _lastRotation = 0.0;
-      
-      // Reset face tracking
       _face = null;
       _estimatedFaceCenterX = 0.5;
       _estimatedFaceCenterY = 0.4;
       _estimatedFaceSize = 0.2;
-      
-      // Restart the camera preview
       _startImageStream();
     });
   }
 
-  Future<void> _toggleTorch() async {
-    if (_controller == null || !_isInitialized) return;
-
-    try {
-      await _controller!.setFlashMode(
-        _torchOn ? FlashMode.off : FlashMode.torch,
-      );
-      setState(() => _torchOn = !_torchOn);
-    } catch (e) {
-      debugPrint('Error toggling torch: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Torch not available')),
-        );
+  void _setEarringMode(String mode) {
+    setState(() {
+      switch (mode) {
+        case 'left':
+          _showLeft = true;
+          _showRight = false;
+          break;
+        case 'right':
+          _showLeft = false;
+          _showRight = true;
+          break;
+        case 'both':
+          _showLeft = true;
+          _showRight = true;
+          break;
       }
-    }
+    });
+  }
+
+  Widget _buildEarringButton(String label, bool isSelected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white, width: 1.5),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.black : Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _closeCameraAndPop() async {
@@ -612,12 +646,10 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // Camera preview or captured image
               if (_controller != null && _isInitialized)
                 _isCaptured && _capturedImage != null
                   ? Stack(
                       children: [
-                        // Captured image
                         CustomPaint(
                           size: Size.infinite,
                           painter: _CapturedImagePainter(
@@ -635,7 +667,6 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
                             necklace: _necklaceImg,
                           ),
                         ),
-                        // Gesture detector overlay
                         if (_adjustmentMode)
                           Positioned.fill(
                             child: GestureDetector(
@@ -644,29 +675,21 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
                                 _initialFocalPoint = details.focalPoint;
                                 _lastScale = _jewelryScale;
                                 _lastRotation = _jewelryRotation;
-                                _lastOffset = Offset(
-                                    _jewelryOffsetX, _jewelryOffsetY);
+                                _lastOffset = Offset(_jewelryOffsetX, _jewelryOffsetY);
                               },
                               onScaleUpdate: (details) {
                                 if (details.scale != 1.0) {
-                                  // Scaling
                                   setState(() {
                                     _jewelryScale = _lastScale * details.scale;
                                   });
                                 } else if (details.rotation != 0.0) {
-                                  // Rotation
                                   setState(() {
-                                    _jewelryRotation =
-                                        _lastRotation + details.rotation;
+                                    _jewelryRotation = _lastRotation + details.rotation;
                                   });
-                                } else if (details.focalPointDelta !=
-                                    Offset.zero) {
-                                  // Panning
+                                } else if (details.focalPointDelta != Offset.zero) {
                                   setState(() {
-                                    _jewelryOffsetX = _lastOffset.dx +
-                                        details.focalPointDelta.dx;
-                                    _jewelryOffsetY = _lastOffset.dy +
-                                        details.focalPointDelta.dy;
+                                    _jewelryOffsetX = _lastOffset.dx + details.focalPointDelta.dx;
+                                    _jewelryOffsetY = _lastOffset.dy + details.focalPointDelta.dy;
                                   });
                                 }
                               },
@@ -676,228 +699,181 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
                     )
                   : CameraPreview(_controller!),
 
-            // Loading indicator
-            if (!_isInitialized ||
-                _controller == null ||
-                !_controller!.value.isInitialized)
-              const Center(
-                  child: CircularProgressIndicator(color: Colors.white)),
+              if (!_isInitialized ||
+                  _controller == null ||
+                  !_controller!.value.isInitialized)
+                const Center(child: CircularProgressIndicator(color: Colors.white)),
 
-            // Gesture controls for captured image
-            if (_isInitialized && _isCaptured && _adjustmentMode)
-              Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onScaleStart: (details) {
-                    _initialFocalPoint = details.focalPoint;
-                    _lastScale = _jewelryScale;
-                    _lastRotation = _jewelryRotation;
-                    _lastOffset = Offset(_jewelryOffsetX, _jewelryOffsetY);
-                  },
-                  onScaleUpdate: (details) {
-                    setState(() {
-                      // Pan with one finger
-                      if (details.pointerCount == 1) {
-                        _jewelryOffsetX = _lastOffset.dx + (details.focalPoint.dx - _initialFocalPoint.dx);
-                        _jewelryOffsetY = _lastOffset.dy + (details.focalPoint.dy - _initialFocalPoint.dy);
-                      }
-                      
-                      // Scale with pinch
-                      if (details.scale != 1.0) {
-                        _jewelryScale = (_lastScale * details.scale).clamp(0.3, 3.0);
-                      }
-                      
-                      // Rotate with two fingers
-                      if (details.rotation != 0.0) {
-                        _jewelryRotation = (_lastRotation + details.rotation) % (2 * 3.14159);
-                      }
-                    });
-                  },
-                  child: Container(color: Colors.transparent),
+              if (_isInitialized && _isCaptured && _adjustmentMode)
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onScaleStart: (details) {
+                      _initialFocalPoint = details.focalPoint;
+                      _lastScale = _jewelryScale;
+                      _lastRotation = _jewelryRotation;
+                      _lastOffset = Offset(_jewelryOffsetX, _jewelryOffsetY);
+                    },
+                    onScaleUpdate: (details) {
+                      setState(() {
+                        if (details.pointerCount == 1) {
+                          _jewelryOffsetX = _lastOffset.dx + (details.focalPoint.dx - _initialFocalPoint.dx);
+                          _jewelryOffsetY = _lastOffset.dy + (details.focalPoint.dy - _initialFocalPoint.dy);
+                        }
+                        if (details.scale != 1.0) {
+                          _jewelryScale = (_lastScale * details.scale).clamp(0.3, 3.0);
+                        }
+                        if (details.rotation != 0.0) {
+                          _jewelryRotation = (_lastRotation + details.rotation) % (2 * 3.14159);
+                        }
+                      });
+                    },
+                    child: Container(color: Colors.transparent),
+                  ),
                 ),
-              ),
 
-            // Face overlay (only in camera mode)
-            if (_isInitialized && !_isCaptured && _face != null)
-              CustomPaint(
-                painter: OverlayPainter(
-                  face: _face!,
-                  imageSize: _controller?.value.previewSize,
-                  product: widget.product,
-                  earringLeft: _earringLeftImg,
-                  earringRight: _earringRightImg,
-                  necklace: _necklaceImg,
-                  showLeft: _showLeft,
-                  showRight: _showRight,
-                  showNecklace: _showNecklace,
-                  mirrorX: true,
-                  rotation: _rotation,
-                  estimatedFaceCenterX: _estimatedFaceCenterX,
-                  estimatedFaceCenterY: _estimatedFaceCenterY,
-                  estimatedFaceSize: _estimatedFaceSize,
-                  faceYaw: _face?.headEulerAngleY ?? 0.0,
-                  faceRoll: _face?.headEulerAngleZ ?? 0.0,
-                  isCapturedMode: false,
-                  manualOffsetX: _jewelryOffsetX,
-                  manualOffsetY: _jewelryOffsetY,
-                  manualScale: _jewelryScale,
-                  manualRotation: _jewelryRotation,
+              if (_isInitialized && !_isCaptured)
+                CustomPaint(
+                  painter: OverlayPainter(
+                    face: _face,
+                    imageSize: _controller?.value.previewSize,
+                    product: widget.product,
+                    earringLeft: _earringLeftImg,
+                    earringRight: _earringRightImg,
+                    necklace: _necklaceImg,
+                    showLeft: _showLeft,
+                    showRight: _showRight,
+                    showNecklace: _showNecklace,
+                    mirrorX: true,
+                    rotation: _rotation,
+                    estimatedFaceCenterX: _estimatedFaceCenterX,
+                    estimatedFaceCenterY: _estimatedFaceCenterY,
+                    estimatedFaceSize: _estimatedFaceSize,
+                    faceYaw: _face?.headEulerAngleY ?? 0.0,
+                    faceRoll: _face?.headEulerAngleZ ?? 0.0,
+                    isCapturedMode: false,
+                    manualOffsetX: _jewelryOffsetX,
+                    manualOffsetY: _jewelryOffsetY,
+                    manualScale: _jewelryScale,
+                    manualRotation: _jewelryRotation,
+                  ),
                 ),
-              ),
 
-            // Debug overlay
-            // if (kDebugMode)
-            //   Positioned(
-            //     top: 10,
-            //     left: 10,
-            //     child: Container(
-            //       padding: const EdgeInsets.all(8),
-            //       decoration: BoxDecoration(
-            //         color: Colors.black54,
-            //         borderRadius: BorderRadius.circular(8),
-            //       ),
-            //       child: Column(
-            //         crossAxisAlignment: CrossAxisAlignment.start,
-            //         children: [
-            //           Text(
-            //             'Face: ${_face != null ? 'Detected' : 'Not Detected'}',
-            //             style:
-            //                 const TextStyle(color: Colors.white, fontSize: 11),
-            //           ),
-            //           Text(
-            //             'Pos: ${_estimatedFaceCenterX.toStringAsFixed(2)}, ${_estimatedFaceCenterY.toStringAsFixed(2)}',
-            //             style:
-            //                 const TextStyle(color: Colors.white, fontSize: 11),
-            //           ),
-            //           Text(
-            //             'Size: ${_estimatedFaceSize.toStringAsFixed(2)}',
-            //             style:
-            //                 const TextStyle(color: Colors.white, fontSize: 11),
-            //           ),
-            //           if (_controller?.value.previewSize != null)
-            //             Text(
-            //               'Preview: ${_controller!.value.previewSize!.width.toInt()}x${_controller!.value.previewSize!.height.toInt()}',
-            //               style: const TextStyle(
-            //                   color: Colors.white, fontSize: 11),
-            //             ),
-            //         ],
-            //       ),
-            //     ),
-            //   ),
-
-            // Top back button
-            Positioned(
-              top: 16,
-              left: 16,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: _closeCameraAndPop,
-                ),
-              ),
-            ),
-
-            // Bottom controls
-            if (_isInitialized && !_isCaptured)
               Positioned(
-                bottom: 32,
-                left: 0,
-                right: 0,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Flash toggle
-                    // IconButton(
-                    //   icon: Icon(
-                    //     _torchOn ? Icons.flash_on : Icons.flash_off,
-                    //     color: Colors.white,
-                    //     size: 30,
-                    //   ),
-                    //   onPressed: _toggleTorch,
-                    // ),
-                    const SizedBox(height: 20),
-                    // Capture button
-                    GestureDetector(
-                      onTap: _captureFrame,
-                      child: Container(
-                        width: 70,
-                        height: 70,
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.white, width: 4),
-                          borderRadius: BorderRadius.circular(35),
+                top: 16,
+                left: 16,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: _closeCameraAndPop,
+                  ),
+                ),
+              ),
+
+              if (_isInitialized && !_isCaptured)
+                Positioned(
+                  bottom: 32,
+                  left: 0,
+                  right: 0,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (widget.product.type == JewelryType.earring)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 20),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.black54,
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _buildEarringButton('Left', _showLeft && !_showRight, () => _setEarringMode('left')),
+                              const SizedBox(width: 8),
+                              _buildEarringButton('Right', _showRight && !_showLeft, () => _setEarringMode('right')),
+                              const SizedBox(width: 8),
+                              _buildEarringButton('Both', _showLeft && _showRight, () => _setEarringMode('both')),
+                            ],
+                          ),
                         ),
+                      const SizedBox(height: 20),
+                      GestureDetector(
+                        onTap: _captureFrame,
                         child: Container(
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
+                          width: 70,
+                          height: 70,
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.white, width: 4),
+                            borderRadius: BorderRadius.circular(35),
+                          ),
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
 
-            // Captured image controls
-            if (_isInitialized && _isCaptured)
-              Positioned(
-                bottom: 32,
-                left: 0,
-                right: 0,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    // Retake button
-                    TextButton(
-                      onPressed: _resetCapture,
-                      child: const Text(
-                        'Retake',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w500,
+              if (_isInitialized && _isCaptured)
+                Positioned(
+                  bottom: 32,
+                  left: 0,
+                  right: 0,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (widget.product.type == JewelryType.earring)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 20),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.black54,
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _buildEarringButton('Left', _showLeft && !_showRight, () => _setEarringMode('left')),
+                              const SizedBox(width: 8),
+                              _buildEarringButton('Right', _showRight && !_showLeft, () => _setEarringMode('right')),
+                              const SizedBox(width: 8),
+                              _buildEarringButton('Both', _showLeft && _showRight, () => _setEarringMode('both')),
+                            ],
+                          ),
                         ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          TextButton(
+                            onPressed: _resetCapture,
+                            child: const Text(
+                              'Retake',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    
-                    // Save button
-                    // ElevatedButton(
-                    //   onPressed: () {
-                    //     // TODO: Implement save functionality
-                    //     _closeCameraAndPop();
-                    //   },
-                    //   style: ElevatedButton.styleFrom(
-                    //     backgroundColor: Colors.blue,
-                    //     shape: RoundedRectangleBorder(
-                    //       borderRadius: BorderRadius.circular(20),
-                    //     ),
-                    //     padding: const EdgeInsets.symmetric(
-                    //       horizontal: 32,
-                    //       vertical: 12,
-                    //     ),
-                    //   ),
-                    //   child: const Text(
-                    //     'Save',
-                    //     style: TextStyle(
-                    //       color: Colors.white,
-                    //       fontSize: 18,
-                    //       fontWeight: FontWeight.w500,
-                    //     ),
-                    //   ),
-                    // ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-                   ],
-        ), // Stack
-      ), // SafeArea
-    ), // Scaffold
-  ); // PopScope
-
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
